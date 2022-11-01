@@ -96,7 +96,11 @@ func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServ
 	if !valid(md["authorization"]) {
 		return nil, errInvalidToken
 	}
+
+	// Jiali: overload handler, do AQM, deduct the tokens on the request, update price info
 	m, err := handler(ctx, req)
+	// Attach the price info to response before sending
+
 	if err != nil {
 		logger("RPC failed with error %v", err)
 	}
