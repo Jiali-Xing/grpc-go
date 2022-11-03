@@ -90,28 +90,6 @@ func newWrappedStream(s grpc.ClientStream) grpc.ClientStream {
 	return &wrappedStream{s}
 }
 
-// streamInterceptor is an example stream interceptor.
-func streamInterceptor(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	var credsConfigured bool
-	for _, o := range opts {
-		_, ok := o.(*grpc.PerRPCCredsCallOption)
-		if ok {
-			credsConfigured = true
-			break
-		}
-	}
-	if !credsConfigured {
-		opts = append(opts, grpc.PerRPCCredentials(oauth.NewOauthAccess(&oauth2.Token{
-			AccessToken: fallbackToken,
-		})))
-	}
-	s, err := streamer(ctx, desc, cc, method, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return newWrappedStream(s), nil
-}
-
 func callUnaryEcho(client ecpb.EchoClient, message string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -147,6 +125,13 @@ func callBidiStreamingEcho(client ecpb.EchoClient) {
 	}
 }
 
+
+func callTalkServer2(client ecpb.EchoClient, message string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client.getServer2()
+}
+
 func main() {
 	flag.Parse()
 
@@ -157,7 +142,7 @@ func main() {
 	}
 
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(creds), grpc.WithUnaryInterceptor(unaryInterceptor), grpc.WithStreamInterceptor(streamInterceptor))
+	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(creds), grpc.WithUnaryInterceptor(unaryInterceptor))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -166,5 +151,5 @@ func main() {
 	// Make a echo client and send RPCs.
 	rgc := ecpb.NewEchoClient(conn)
 	callUnaryEcho(rgc, "hello world")
-	callBidiStreamingEcho(rgc)
+	//callBidiStreamingEcho(rgc)
 }

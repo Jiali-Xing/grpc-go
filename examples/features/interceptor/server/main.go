@@ -60,6 +60,11 @@ func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoRes
 	return &pb.EchoResponse{Message: in.Message}, nil
 }
 
+
+func (s *server) getServer2() {
+	fmt.Printf("calling new function\n")
+}
+
 func (s *server) BidirectionalStreamingEcho(stream pb.Echo_BidirectionalStreamingEchoServer) error {
 	for {
 		in, err := stream.Recv()
@@ -127,22 +132,6 @@ func newWrappedStream(s grpc.ServerStream) grpc.ServerStream {
 	return &wrappedStream{s}
 }
 
-func streamInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-	// authentication (token verification)
-	md, ok := metadata.FromIncomingContext(ss.Context())
-	if !ok {
-		return errMissingMetadata
-	}
-	if !valid(md["authorization"]) {
-		return errInvalidToken
-	}
-
-	err := handler(srv, newWrappedStream(ss))
-	if err != nil {
-		logger("RPC failed with error %v", err)
-	}
-	return err
-}
 
 func main() {
 	flag.Parse()
@@ -158,7 +147,7 @@ func main() {
 		log.Fatalf("failed to create credentials: %v", err)
 	}
 
-	s := grpc.NewServer(grpc.Creds(creds), grpc.UnaryInterceptor(unaryInterceptor), grpc.StreamInterceptor(streamInterceptor))
+	s := grpc.NewServer(grpc.Creds(creds), grpc.UnaryInterceptor(unaryInterceptor))
 
 	// Register EchoServer on the server.
 	pb.RegisterEchoServer(s, &server{})
