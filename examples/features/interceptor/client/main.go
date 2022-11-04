@@ -166,5 +166,5 @@ func main() {
 	// Make a echo client and send RPCs.
 	rgc := ecpb.NewEchoClient(conn)
 	callUnaryEcho(rgc, "hello world")
-	callBidiStreamingEcho(rgc)
+	//callBidiStreamingEcho(rgc)
 }

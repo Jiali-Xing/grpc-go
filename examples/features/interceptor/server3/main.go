@@ -40,7 +40,7 @@ import (
 )
 
 var (
-	port = flag.Int("port", 50052, "the port to serve on")
+	port = flag.Int("port", 50053, "the port to serve on")
 
 	errMissingMetadata = status.Errorf(codes.InvalidArgument, "missing metadata")
 	errInvalidToken    = status.Errorf(codes.Unauthenticated, "invalid token")

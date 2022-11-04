@@ -29,6 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/credentials/oauth"
+	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -37,10 +39,56 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "google.golang.org/grpc/examples/features/proto/echo"
+	ecpb "google.golang.org/grpc/examples/features/proto/echo"
 )
 
+
+const fallbackToken = "some-secret-token"
+
+func callUnaryEcho(client ecpb.EchoClient, message string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	resp, err := client.UnaryEcho(ctx, &ecpb.EchoRequest{Message: message})
+	if err != nil {
+		log.Fatalf("client.UnaryEcho(_) = _, %v: ", err)
+	}
+	fmt.Println("UnaryEcho: ", resp.Message)
+
+
+}
+
+
+// unaryInterceptor is an example unary interceptor.
+func unaryInterceptor_client(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+	var credsConfigured bool
+	for _, o := range opts {
+		_, ok := o.(grpc.PerRPCCredsCallOption)
+		if ok {
+			credsConfigured = true
+			break
+		}
+	}
+	if !credsConfigured {
+		opts = append(opts, grpc.PerRPCCredentials(oauth.NewOauthAccess(&oauth2.Token{
+			AccessToken: fallbackToken,
+		})))
+	}
+	start := time.Now()
+
+	// Jiali: before sending. check the price, calculate the #tokens to add to request, update the total tokens
+	err := invoker(ctx, method, req, reply, cc, opts...)
+	// Jiali: after replied. update and store the price info for future
+
+	end := time.Now()
+	logger("RPC: %s, start time: %s, end time: %s, err: %v", method, start.Format("Basic"), end.Format(time.RFC3339), err)
+	return err
+}
+
+
+var addr = flag.String("addr", "localhost:50052", "the address to connect to")
+
 var (
-	port = flag.Int("port", 50052, "the port to serve on")
+	port = flag.Int("port", 50051, "the port to serve on")
 
 	errMissingMetadata = status.Errorf(codes.InvalidArgument, "missing metadata")
 	errInvalidToken    = status.Errorf(codes.Unauthenticated, "invalid token")
@@ -56,6 +104,22 @@ type server struct {
 }
 
 func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoResponse, error) {
+	//client stuff
+	creds_client, err_client := credentials.NewClientTLSFromFile(data.Path("x509/ca_cert.pem"), "x.test.example.com")
+	if err_client != nil {
+		log.Fatalf("failed to load credentials: %v", err_client)
+	}
+
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(creds_client), grpc.WithUnaryInterceptor(unaryInterceptor_client))
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+
+	// Make a echo client and send RPCs.
+	rgc := ecpb.NewEchoClient(conn)
+	callUnaryEcho(rgc, "hello world")
 	fmt.Printf("unary echoing message %q\n", in.Message)
 	return &pb.EchoResponse{Message: in.Message}, nil
 }
@@ -166,4 +230,7 @@ func main() {
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
+
+
+
 }
