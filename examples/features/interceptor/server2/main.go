@@ -27,6 +27,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc/credentials/oauth"
@@ -85,7 +86,8 @@ func unaryInterceptor_client(ctx context.Context, method string, req, reply inte
 }
 
 
-var addr = flag.String("addr", "localhost:50052", "the address to connect to")
+var addr1 = flag.String("addr1", "localhost:50052", "the address to connect to")
+var addr2 = flag.String("addr2", "localhost:50053", "the address to connect to")
 
 var (
 	port = flag.Int("port", 50051, "the port to serve on")
@@ -114,8 +116,12 @@ func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoRes
 	md, _ := metadata.FromIncomingContext(ctx)
 
 	logger("tokens are %s\n", md["tokens"])
-	// Set up a connection to the server.
-	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(creds_client), grpc.WithUnaryInterceptor(unaryInterceptor_client))
+	tok_string := md["tokens"][0]
+	i, _ := strconv.Atoi(tok_string)
+
+	if (i > 5) {
+      
+	conn, err := grpc.Dial(*addr1, grpc.WithTransportCredentials(creds_client), grpc.WithUnaryInterceptor(unaryInterceptor_client))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -126,6 +132,22 @@ func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoRes
 	callUnaryEcho(rgc, "server 2")
 	fmt.Printf("unary echoing message %q\n", in.Message)
 	return &pb.EchoResponse{Message: in.Message}, nil
+	} else { 
+	conn, err := grpc.Dial(*addr2, grpc.WithTransportCredentials(creds_client), grpc.WithUnaryInterceptor(unaryInterceptor_client))
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+
+	// Make a echo client and send RPCs.
+	rgc := ecpb.NewEchoClient(conn)
+	callUnaryEcho(rgc, "server 2")
+	fmt.Printf("unary echoing message %q\n", in.Message)
+	return &pb.EchoResponse{Message: in.Message}, nil
+
+	}
+
+	// Set up a connection to the server.
 }
 
 func (s *server) BidirectionalStreamingEcho(stream pb.Echo_BidirectionalStreamingEchoServer) error {
