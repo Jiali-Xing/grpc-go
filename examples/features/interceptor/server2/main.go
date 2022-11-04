@@ -110,6 +110,10 @@ func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoRes
 		log.Fatalf("failed to load credentials: %v", err_client)
 	}
 
+
+	md, _ := metadata.FromIncomingContext(ctx)
+
+	logger("tokens are %s\n", md["tokens"])
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(creds_client), grpc.WithUnaryInterceptor(unaryInterceptor_client))
 	if err != nil {
@@ -119,7 +123,7 @@ func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoRes
 
 	// Make a echo client and send RPCs.
 	rgc := ecpb.NewEchoClient(conn)
-	callUnaryEcho(rgc, "hello world")
+	callUnaryEcho(rgc, "server 2")
 	fmt.Printf("unary echoing message %q\n", in.Message)
 	return &pb.EchoResponse{Message: in.Message}, nil
 }
@@ -160,8 +164,12 @@ func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServ
 	if !valid(md["authorization"]) {
 		return nil, errInvalidToken
 	}
+	logger("tokens are %s\n", md["tokens"])
 
 	// Jiali: overload handler, do AQM, deduct the tokens on the request, update price info
+
+
+
 	m, err := handler(ctx, req)
 	// Attach the price info to response before sending
 

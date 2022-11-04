@@ -56,6 +56,9 @@ type server struct {
 }
 
 func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoResponse, error) {
+	md, _ := metadata.FromIncomingContext(ctx)
+
+	logger("tokens are %s\n", md["tokens"])
 	fmt.Printf("unary echoing message %q\n", in.Message)
 	return &pb.EchoResponse{Message: in.Message}, nil
 }

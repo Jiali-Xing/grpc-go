@@ -24,15 +24,19 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strconv"
 	"log"
 	"time"
 
+	"math/rand"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
 	"google.golang.org/grpc/examples/data"
+	"google.golang.org/grpc/metadata"
 	ecpb "google.golang.org/grpc/examples/features/proto/echo"
+
 )
 
 var addr = flag.String("addr", "localhost:50051", "the address to connect to")
@@ -62,6 +66,12 @@ func unaryInterceptor(ctx context.Context, method string, req, reply interface{}
 	start := time.Now()
 
 	// Jiali: before sending. check the price, calculate the #tokens to add to request, update the total tokens
+
+	rand.Seed(time.Now().UnixNano())
+	tok := rand.Intn(10)
+	tok_string := strconv.Itoa(tok)
+	ctx = metadata.AppendToOutgoingContext(ctx, "tokens", tok_string)
+
 	err := invoker(ctx, method, req, reply, cc, opts...)
 	// Jiali: after replied. update and store the price info for future
 
