@@ -45,16 +45,15 @@ import (
 
 const fallbackToken = "some-secret-token"
 
-func callUnaryEcho(client ecpb.EchoClient, message string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func callUnaryEcho(ctx context.Context, client ecpb.EchoClient, message string) {
+	// ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// defer cancel()
+	// [critical] to pass ctx to subrequests.
 	resp, err := client.UnaryEcho(ctx, &ecpb.EchoRequest{Message: message})
 	if err != nil {
 		log.Fatalf("client.UnaryEcho(_) = _, %v: ", err)
 	}
 	fmt.Println("UnaryEcho: ", resp.Message)
-
-
 }
 
 
@@ -73,14 +72,14 @@ func unaryInterceptor_client(ctx context.Context, method string, req, reply inte
 			AccessToken: fallbackToken,
 		})))
 	}
-	start := time.Now()
+	// start := time.Now()
 
 	// Jiali: before sending. check the price, calculate the #tokens to add to request, update the total tokens
 	err := invoker(ctx, method, req, reply, cc, opts...)
 	// Jiali: after replied. update and store the price info for future
 
-	end := time.Now()
-	logger("RPC: %s, start time: %s, end time: %s, err: %v", method, start.Format("Basic"), end.Format(time.RFC3339), err)
+	// end := time.Now()
+	// logger("RPC: %s, start time: %s, end time: %s, err: %v", method, start.Format("Basic"), end.Format(time.RFC3339), err)
 	return err
 }
 
@@ -110,10 +109,6 @@ func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoRes
 		log.Fatalf("failed to load credentials: %v", err_client)
 	}
 
-
-	md, _ := metadata.FromIncomingContext(ctx)
-
-	logger("tokens are %s\n", md["tokens"])
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(creds_client), grpc.WithUnaryInterceptor(unaryInterceptor_client))
 	if err != nil {
@@ -123,8 +118,9 @@ func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoRes
 
 	// Make a echo client and send RPCs.
 	rgc := ecpb.NewEchoClient(conn)
-	callUnaryEcho(rgc, "server 2")
-	fmt.Printf("unary echoing message %q\n", in.Message)
+	fmt.Printf("unary echoing message at server 2 %q\n", in.Message)
+	// [critical] to pass ctx from upstream to downstream
+	callUnaryEcho(ctx, rgc, in.Message)
 	return &pb.EchoResponse{Message: in.Message}, nil
 }
 
@@ -164,11 +160,12 @@ func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServ
 	if !valid(md["authorization"]) {
 		return nil, errInvalidToken
 	}
-	logger("tokens are %s\n", md["tokens"])
 
+	logger("tokens are %s\n", md["tokens"])
 	// Jiali: overload handler, do AQM, deduct the tokens on the request, update price info
 
-
+	// [critical] Jiali: Being outgoing seems to be critical for us.
+	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	m, err := handler(ctx, req)
 	// Attach the price info to response before sending
@@ -178,6 +175,7 @@ func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServ
 	}
 	return m, err
 }
+
 
 // wrappedStream wraps around the embedded grpc.ServerStream, and intercepts the RecvMsg and
 // SendMsg method call.

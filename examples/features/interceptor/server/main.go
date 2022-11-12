@@ -56,11 +56,8 @@ type server struct {
 }
 
 func (s *server) UnaryEcho(ctx context.Context, in *pb.EchoRequest) (*pb.EchoResponse, error) {
-	md, _ := metadata.FromIncomingContext(ctx)
-
-	logger("tokens are %s\n", md["tokens"])
 	fmt.Printf("unary echoing message %q\n", in.Message)
-	return &pb.EchoResponse{Message: in.Message}, nil
+	return &pb.EchoResponse{Message: "Response from backend."}, nil
 }
 
 func (s *server) BidirectionalStreamingEcho(stream pb.Echo_BidirectionalStreamingEchoServer) error {
@@ -100,6 +97,7 @@ func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServ
 		return nil, errInvalidToken
 	}
 
+	logger("tokens are %s\n", md["tokens"])
 	// Jiali: overload handler, do AQM, deduct the tokens on the request, update price info
 	m, err := handler(ctx, req)
 	// Attach the price info to response before sending

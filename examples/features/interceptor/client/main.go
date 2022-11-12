@@ -63,7 +63,7 @@ func unaryInterceptor(ctx context.Context, method string, req, reply interface{}
 			AccessToken: fallbackToken,
 		})))
 	}
-	start := time.Now()
+	// start := time.Now()
 
 	// Jiali: before sending. check the price, calculate the #tokens to add to request, update the total tokens
 
@@ -75,8 +75,8 @@ func unaryInterceptor(ctx context.Context, method string, req, reply interface{}
 	err := invoker(ctx, method, req, reply, cc, opts...)
 	// Jiali: after replied. update and store the price info for future
 
-	end := time.Now()
-	logger("RPC: %s, start time: %s, end time: %s, err: %v", method, start.Format("Basic"), end.Format(time.RFC3339), err)
+	// end := time.Now()
+	// logger("RPC: %s, start time: %s, end time: %s, err: %v", method, start.Format("Basic"), end.Format(time.RFC3339), err)
 	return err
 }
 
