@@ -134,6 +134,7 @@ func (t *PriceTable) Take(ctx context.Context, tokens int64) (int64, error) {
 	// }
 
 	if tokens < state.Price {
+		fmt.Printf("Request rejected for lack of tokens. Price is %d\n", state.Price)
 		return state.Price-tokens, ErrLimitExhausted
 	}
 
@@ -141,8 +142,8 @@ func (t *PriceTable) Take(ctx context.Context, tokens int64) (int64, error) {
 	var tokenleft int64
 	tokenleft = tokens - state.Price
 
-	state.Price = tokens
-	fmt.Printf("Price updated to %d\n", tokens)
+	state.Price += 1
+	fmt.Printf("Price updated to %d\n", state.Price)
 
 	if err = t.backend.SetState(ctx, state); err != nil {
 		return 0, err
@@ -289,7 +290,7 @@ func valid(authorization []string) bool {
 	return token == "some-secret-token"
 }
 
-func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (priceTable *PriceTable) unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	// authentication (token verification)
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -301,16 +302,6 @@ func unaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServ
 
 	logger("tokens are %s\n", md["tokens"])
 	// Jiali: overload handler, do AQM, deduct the tokens on the request, update price info
-	// rate := time.Second * 3
-	// clock := NewSystemClock()
-	// logger := NewStdLogger()
-
-	priceTable := NewPriceTable(
-		2,
-		// rate,
-		NewPriceTableInMemory(),
-		// clock, logger,
-	)
 
 	tok, err := strconv.ParseInt(md["tokens"][0], 10, 64)
 
@@ -389,7 +380,12 @@ func main() {
 		log.Fatalf("failed to create credentials: %v", err)
 	}
 
-	s := grpc.NewServer(grpc.Creds(creds), grpc.UnaryInterceptor(unaryInterceptor), grpc.StreamInterceptor(streamInterceptor))
+	const initialPrice = 2
+	priceTable := NewPriceTable(
+		initialPrice,
+		NewPriceTableInMemory(),
+	)
+	s := grpc.NewServer(grpc.Creds(creds), grpc.UnaryInterceptor(priceTable.unaryInterceptor), grpc.StreamInterceptor(streamInterceptor))
 
 	// Register EchoServer on the server.
 	pb.RegisterEchoServer(s, &server{})
